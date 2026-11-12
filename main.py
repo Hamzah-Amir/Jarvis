@@ -1,6 +1,6 @@
 import os
 from google import genai
-from tools import search_web, get_time, open_app, silent_search, open_web
+from tools import search_web, get_time, open_app, silent_search, open_web, remember, list_topics
 from datetime import datetime
 from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL, slugify
 from dotenv import load_dotenv
