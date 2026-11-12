@@ -1,3 +1,8 @@
 google-genai
 python-dotenv
 tavily-python
+pyttsx3
+edge-tts
+groq
+scipy
+sounddevice
