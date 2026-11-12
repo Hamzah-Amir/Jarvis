@@ -6,3 +6,4 @@ edge-tts
 groq
 scipy
 sounddevice
+openwakeword
