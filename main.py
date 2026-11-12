@@ -1,8 +1,9 @@
 import os
 from google import genai
+import pyttsx3
 from tools import search_web, get_time, open_app, silent_search, open_web, remember, list_topics, recall
 from datetime import datetime
-from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL, slugify
+from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, VOICE_VOLUME, VOICE_MODE, slugify
 from dotenv import load_dotenv
 from pathlib import Path
 import json
@@ -74,6 +75,13 @@ class JARVIS:
         # memory files changed after this get cleaned on exit
         # (-1s margin: Windows file times can lag slightly behind time.time())
         self.start_time = time.time() - 1
+
+        # Speaking configs
+        self.speak_engine = pyttsx3.init()
+        self.speak_engine.setProperty('rate', VOICE_RATE)
+        self.speak_engine.setProperty('volume', VOICE_VOLUME)
+
+        # LLM configs
         self.client = genai.Client(api_key=os.getenv("JARVIS_API"))
         self.chats = self.client.chats.create(
             model=MODEL,
@@ -123,6 +131,10 @@ class JARVIS:
             except Exception as e:
                 print(f"(Memory cleanup skipped for {path.stem}: {e})")
 
+    def speak(self, text:str) -> None:
+        self.speak_engine.say(text)
+        self.speak_engine.runAndWait()
+
     def run(self):
         try:
             while True:
@@ -131,6 +143,8 @@ class JARVIS:
                     break
                 reply = self.ask(user)
                 print("JARVIS:", reply)
+                if VOICE_MODE:
+                    self.speak(reply)
         except KeyboardInterrupt:
             print()
         finally:

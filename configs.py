@@ -14,6 +14,11 @@ CHATS_DIR = STORAGE_DIR / "chats"
 MEMORY_DIR = STORAGE_DIR / "memory"
 PROFILE_FILE = MEMORY_DIR / "profile.md"
 
+# TTS Configs.
+VOICE_MODE = True
+VOICE_RATE = 170         
+VOICE_VOLUME = 0.9       
+
 
 def slugify(text: str, max_length: int = 40) -> str:
     """Turn text into a safe filename part, e.g. "Who won? Pak vs Iran!" -> "who-won-pak-vs-iran"."""
