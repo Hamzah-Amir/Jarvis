@@ -5,11 +5,12 @@ from groq import Groq
 import numpy as np
 import sounddevice as sd
 from openwakeword.model import Model
+from openwakeword.vad import VAD
 from scipy.io.wavfile import write
 import pyttsx3
 from tools import search_web, get_time, open_app, silent_search, open_web, remember, list_topics, recall
 from datetime import datetime
-from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, VOICE_VOLUME, STT_MODEL, SAMPLE_RATE, RECORD_SECONDS, CHUNK, VOICE_MODE, WAKE_WORD, WAKE_THRESHOLD, SILENCE_THRESHOLD, slugify
+from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, VOICE_VOLUME, STT_MODEL,MIN_SPEECH_PIECES, SAMPLE_RATE, RECORD_SECONDS, CHUNK, VOICE_MODE, WAKE_WORD, WAKE_THRESHOLD, SILENCE_THRESHOLD, slugify
 from dotenv import load_dotenv
 from pathlib import Path
 import json
@@ -93,7 +94,8 @@ class JARVIS:
         # groq
         self.groq_client = Groq(api_key=os.getenv("JARVIS_EARS"))
         # wake word model (loaded once, runs locally)
-        self.wake_model = Model(wakeword_models=[WAKE_WORD], inference_framework="onnx")
+        self.wake_model = Model(wakeword_models=[WAKE_WORD], inference_framework="onnx", vad_threshold=0.5)
+        self.vad = VAD()
 
     def ask(self, text: str) ->str:
         reply = self.chats.send_message(text)
@@ -159,8 +161,14 @@ class JARVIS:
         try:
             audio = sd.rec(int(RECORD_SECONDS * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype="int16")
             sd.wait()
-            if np.abs(audio).max() < SILENCE_THRESHOLD:  
-                return "" 
+
+            # Adjusting BG voices
+            self.vad.reset_states()                                          # fresh start for each recording
+            pieces = audio.flatten()[: len(audio) // 1600 * 1600].reshape(-1, 1600)  # 0.1 s pieces
+            speech = sum(self.vad.predict(p, frame_size=1600) > 0.5 for p in pieces) # count voice pieces
+            if speech < MIN_SPEECH_PIECES:                                   # < 0.5 s of voice = silence
+                return ""
+            
             buffer = io.BytesIO()  # .wav in memory, never on disk
             write(buffer, SAMPLE_RATE, audio)
             result = self.groq_client.audio.transcriptions.create(
