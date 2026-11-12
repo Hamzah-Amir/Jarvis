@@ -150,7 +150,8 @@ def recall(topic:str) -> str:
         return f"Nothing saved about {topic} in the memory"
     
     except Exception as e:
-        return f"Could not read memory: {e}"
+        print(f"Could not read memory: {e}")
+        return ""
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
