@@ -19,9 +19,22 @@ VOICE_MODE = True
 VOICE_RATE = 170         
 VOICE_VOLUME = 0.9       
 
+# STT Configs
+RECORD_SECONDS = 5
+SAMPLE_RATE = 16000
+STT_MODEL = "whisper-large-v3-turbo"
+
+# Wake word Configs
+WAKE_WORD = "hey_jarvis"   # built-in openWakeWord model name
+WAKE_THRESHOLD = 0.5       # score 0-1 needed to count as detected (raise if false triggers)
+CHUNK = 1280               # samples per mic read = 80 ms at 16 kHz (what openWakeWord expects)
+SILENCE_THRESHOLD = 1000   # loudest sample below this = silent recording -> back to standby
 
 def slugify(text: str, max_length: int = 40) -> str:
     """Turn text into a safe filename part, e.g. "Who won? Pak vs Iran!" -> "who-won-pak-vs-iran"."""
     text = text.lower().strip()
     text = re.sub(r"[^a-z0-9]+", "-", text)  # anything not a letter/number becomes "-"
     return text.strip("-")[:max_length].strip("-") or "untitled"
+
+if __name__ == "__main__":
+    pass
