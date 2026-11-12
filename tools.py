@@ -3,6 +3,7 @@ from datetime import datetime
 import subprocess
 import webbrowser
 from tavily import TavilyClient
+from configs import MEMORY_DIR, slugify
 
 def get_time() -> str:
     """Get the current date and time."""
@@ -86,8 +87,52 @@ def silent_search(query: str, topic: str = "general") -> str:
     except Exception as e:
         return f"Search failed: {e}"
 
+def list_topics() -> str:
+    """List the names of all saved memory topics (e.g. "profile, preferences, jarvis-project").
+
+    Call this BEFORE remember or recall, so you reuse an existing topic name
+    instead of creating a new one with a slightly different name.
+    """
+    topics = [file.stem for file in MEMORY_DIR.glob("*.md")]
+    if not topics:
+        return "No topics yet."
+    return ", ".join(topics)
+
+def remember(topic: str, fact: str) -> str:
+    """Save one important fact about the user to long-term memory.
+
+    Use this when the user shares something worth remembering in future chats:
+    personal info, preferences, ongoing projects, goals, people they mention, or when
+    they say "remember that...". Do NOT save small talk, one-off questions or temporary details.
+
+    Call list_topics first and reuse an existing topic if one fits.
+
+    Args:
+        topic: Short topic name, e.g. "profile" (name, studies, basics about the user),
+            "preferences", "jarvis-project". Create a new topic only if none fits.
+        fact: One short, self-contained fact that makes sense on its own later,
+            e.g. "User's name is Hamza" or "Prefers Chrome as main browser".
+    """
+    try:
+        topic = slugify(topic)
+        path = MEMORY_DIR / f"{topic}.md"
+
+        if path.exists():
+            content = path.read_text(encoding="utf-8")
+            if f"- {fact}" in content:
+                return "Already saved." 
+            
+        with open(path, 'a', encoding='utf-8') as memory:
+            memory.write(f"- {fact}\n")
+            return f"Saved to {topic}: {fact}"
+    except Exception as e:
+        return f"Could not save memory: {e}"
+
+
 if __name__ == "__main__":
     # from dotenv import load_dotenv
     # load_dotenv()
     # print(silent_search("Who won the 2026 US midterm elections?", topic="news"))
-    open_web('youtube.com')
+    print(remember("test", "First fact"))
+    print(remember("test", "First fact"))   # Already saved.
+    print(list_topics())                    # profile, test
