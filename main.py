@@ -1,6 +1,6 @@
 import os
 from google import genai
-from tools import search_web, get_time, open_app, silent_search, open_web, remember, list_topics
+from tools import search_web, get_time, open_app, silent_search, open_web, remember, list_topics, recall
 from datetime import datetime
 from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL, slugify
 from dotenv import load_dotenv
@@ -23,7 +23,8 @@ Answering:
   prices, recent events). Summarize the results in your own words.
 - Use the PC tools only when the user asks you to do something on the computer.
 - After using a tool, say briefly what you did or found. If a tool fails, say so honestly.
-- If a request is unclear, ask one short question instead of guessing."""
+- If a request is unclear, ask one short question instead of guessing.
+"""
 
 
 class JARVIS:
@@ -32,13 +33,17 @@ class JARVIS:
         Path(MEMORY_DIR).mkdir(exist_ok=True)
         Path(CHATS_DIR).mkdir(exist_ok=True)
         Path(PROFILE_FILE).touch(exist_ok=True)
+        prompt = SYSTEM_PROMPT
+        profile = PROFILE_FILE.read_text(encoding='utf-8').strip()
+        if profile:
+            prompt += f"What you know about the User\n:{profile}"
         self.chat_file = None
         self.client = genai.Client(api_key=os.getenv("JARVIS_API"))
         self.chats = self.client.chats.create(
             model=MODEL,
             config={
-                "tools": [open_app, open_web, search_web, get_time, silent_search],
-                "system_instruction": SYSTEM_PROMPT,
+                "tools": [search_web, get_time, open_app, silent_search, open_web, remember, list_topics, recall],
+                "system_instruction": prompt,
             })
 
     def ask(self, text: str) ->str:
