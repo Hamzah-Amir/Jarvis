@@ -1,7 +1,11 @@
 import os
-from dotenv import load_dotenv
 from google import genai
 from tools import search_web, get_time, open_app, silent_search, open_web
+from datetime import datetime
+from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL, slugify
+from dotenv import load_dotenv
+from pathlib import Path
+import json
 load_dotenv()
 
 SYSTEM_PROMPT = """You are JARVIS, a personal assistant running on the user's Windows PC.
@@ -24,10 +28,14 @@ Answering:
 
 class JARVIS:
     def __init__(self):
+        Path(STORAGE_DIR).mkdir(exist_ok=True)
+        Path(MEMORY_DIR).mkdir(exist_ok=True)
+        Path(CHATS_DIR).mkdir(exist_ok=True)
+        Path(PROFILE_FILE).touch(exist_ok=True)
+        self.chat_file = None
         self.client = genai.Client(api_key=os.getenv("JARVIS_API"))
-        self.model = 'gemini-3.6-flash'
         self.chats = self.client.chats.create(
-            model=self.model,
+            model=MODEL,
             config={
                 "tools": [open_app, open_web, search_web, get_time, silent_search],
                 "system_instruction": SYSTEM_PROMPT,
@@ -35,15 +43,32 @@ class JARVIS:
 
     def ask(self, text: str) ->str:
         reply = self.chats.send_message(text)
+        if self.chat_file is None:
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            title = slugify(text)
+            file_name = CHATS_DIR / f"{timestamp}_{title}.json"
+            file_name.touch()
+            self.chat_file = file_name
+        self.save_chats()
         return reply.text
+    
+    def save_chats(self) -> None:
+        chat_history = self.chats.get_history()
+        history = [content.model_dump(mode='json', exclude_none=True)
+                   for content in chat_history]
+        with open(self.chat_file, "w", encoding="utf-8") as file:
+            json.dump(history, file, indent=2)
 
     def run(self):
-        while True:
-            user = input("You: ")
-            if user.lower() in ('exit', 'quit'):
-                break
-            reply = self.ask(user)
-            print("JARVIS:", reply)
+        try:    
+            while True:
+                user = input("You: ")
+                if user.lower() in ('exit', 'quit'):
+                    break
+                reply = self.ask(user)
+                print("JARVIS:", reply)
+        except KeyboardInterrupt:
+            print("Going standby!")
 
 if __name__ == "__main__":
     jarvis = JARVIS()
