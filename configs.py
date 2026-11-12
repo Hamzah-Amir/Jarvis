@@ -6,7 +6,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 
 # Model
-MODEL = "gemini-3.6-flash"
+MODEL = "gemini-3.5-flash-lite"
 
 # Storage paths (Path objects, built from each other with "/")
 STORAGE_DIR = BASE_DIR / "storage"
