@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from google import genai
-from tools import search_web, get_time, open_app, silent_search
+from tools import search_web, get_time, open_app, silent_search, open_web
 load_dotenv()
 
 SYSTEM_PROMPT = """You are JARVIS, a personal assistant running on the user's Windows PC.
@@ -29,7 +29,7 @@ class JARVIS:
         self.chats = self.client.chats.create(
             model=self.model,
             config={
-                "tools": [open_app, search_web, get_time, silent_search],
+                "tools": [open_app, open_web, search_web, get_time, silent_search],
                 "system_instruction": SYSTEM_PROMPT,
             })
 

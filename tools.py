@@ -16,11 +16,33 @@ def open_app(name:str) -> str:
     except OSError:
         return f"Cannot find the app: '{name}'"
 
+def open_web(url: str) -> str:
+    """Open a website in the user's default web browser.
+
+    Use this when the user wants to open or go to a specific website,
+    e.g. "open youtube", "go to github.com", "open my gmail".
+    Convert site names to full URLs yourself, e.g. "youtube" -> "https://www.youtube.com".
+
+    Do NOT use this to search for something. Use search_web for that.
+
+    Args:
+        url: The website URL, e.g. "https://www.youtube.com".
+    """
+    url = url.strip()
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    try:
+        if webbrowser.open(url):
+            return f"Opened {url} in the browser."
+        return f"Could not open {url}: no browser found."
+    except Exception as e:
+        return f"Could not open {url}: {e}"
+
 def search_web(query: str) -> str:
     """Open a Google search for the query in the user's web browser.
     Only use this when the user explicitly asks to search the web, google something,
     or open results in the browser. You cannot read the results, so never use this
-    to answer questions yourself."""
+    to answer questions yourself. Do NOT use this to open a website; use open_web for that."""
     webbrowser.open(url=f"https://www.google.com/search?q={query}", new=0)
     return f"Searched for {query}"
 
@@ -65,6 +87,7 @@ def silent_search(query: str, topic: str = "general") -> str:
         return f"Search failed: {e}"
 
 if __name__ == "__main__":
-    from dotenv import load_dotenv
-    load_dotenv()
-    print(silent_search("Who won the 2026 US midterm elections?", topic="news"))
+    # from dotenv import load_dotenv
+    # load_dotenv()
+    # print(silent_search("Who won the 2026 US midterm elections?", topic="news"))
+    open_web('youtube.com')
