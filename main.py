@@ -38,11 +38,25 @@ Memory:
 
 """
 
-CLEANUP_PROMPT = """You maintain a memory file of facts about a user. Rewrite it cleanly:
-- Merge facts that mean the same thing into one fact.
+CLEANUP_PROMPT = """You maintain a memory file of facts about a user. Rewrite it with no repetition:
+- Remove any fact whose information is already stated in another fact, even partly
+  or in different words. Each piece of information must appear exactly once.
 - If two facts contradict each other, keep only the newer one (facts lower in the list are newer).
-- Keep every distinct fact. Never invent, guess or add new information.
-- Each fact is short and self-contained, on its own line, starting with "- ".
+- Split long combined facts into short single facts.
+- Never drop unique information. Never invent, guess or add new information.
+- One fact per line, starting with "- ". Refer to the user by name if known.
+
+Example input:
+- Ali is a teacher who lives in Lahore
+- User is a teacher
+- User lives in Lahore
+- User likes tea
+Example output:
+- User's name is Ali
+- Ali is a teacher
+- Ali lives in Lahore
+- Ali likes tea
+
 Return only the cleaned list, with no other text."""
 
 
