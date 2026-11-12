@@ -153,6 +153,6 @@ def recall(topic:str) -> str:
         return f"Could not read memory: {e}"
 
 if __name__ == "__main__":
-    # from dotenv import load_dotenv
-    # load_dotenv()
+    from dotenv import load_dotenv
+    load_dotenv()
     print(silent_search("Who won the 2026 US midterm elections?", topic="news"))
