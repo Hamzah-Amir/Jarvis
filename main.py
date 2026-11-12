@@ -1,9 +1,15 @@
 import os
+import io
 from google import genai
+from groq import Groq
+import numpy as np
+import sounddevice as sd
+from openwakeword.model import Model
+from scipy.io.wavfile import write
 import pyttsx3
 from tools import search_web, get_time, open_app, silent_search, open_web, remember, list_topics, recall
 from datetime import datetime
-from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, VOICE_VOLUME, VOICE_MODE, slugify
+from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, VOICE_VOLUME, STT_MODEL, SAMPLE_RATE, RECORD_SECONDS, CHUNK, VOICE_MODE, WAKE_WORD, WAKE_THRESHOLD, SILENCE_THRESHOLD, slugify
 from dotenv import load_dotenv
 from pathlib import Path
 import json
@@ -76,11 +82,6 @@ class JARVIS:
         # (-1s margin: Windows file times can lag slightly behind time.time())
         self.start_time = time.time() - 1
 
-        # Speaking configs
-        self.speak_engine = pyttsx3.init()
-        self.speak_engine.setProperty('rate', VOICE_RATE)
-        self.speak_engine.setProperty('volume', VOICE_VOLUME)
-
         # LLM configs
         self.client = genai.Client(api_key=os.getenv("JARVIS_API"))
         self.chats = self.client.chats.create(
@@ -89,6 +90,10 @@ class JARVIS:
                 "tools": [search_web, get_time, open_app, silent_search, open_web, remember, list_topics, recall],
                 "system_instruction": prompt,
             })
+        # groq
+        self.groq_client = Groq(api_key=os.getenv("JARVIS_EARS"))
+        # wake word model (loaded once, runs locally)
+        self.wake_model = Model(wakeword_models=[WAKE_WORD], inference_framework="onnx")
 
     def ask(self, text: str) ->str:
         reply = self.chats.send_message(text)
@@ -132,15 +137,62 @@ class JARVIS:
                 print(f"(Memory cleanup skipped for {path.stem}: {e})")
 
     def speak(self, text:str) -> None:
-        self.speak_engine.say(text)
-        self.speak_engine.runAndWait()
+        speak_engine = pyttsx3.init()
+        speak_engine.setProperty('rate', VOICE_RATE)
+        speak_engine.setProperty('volume', VOICE_VOLUME)
+        speak_engine.say(text)
+        speak_engine.runAndWait()
+        speak_engine.stop()
+
+    def wait_for_wake_word(self) -> None:
+        """STANDBY: block until 'Hey Jarvis' is heard. Runs locally, nothing is sent online."""
+        self.wake_model.reset()  # forget old scores so it doesn't instantly re-trigger
+        with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="int16", blocksize=CHUNK) as stream:
+            while True:
+                chunk, _ = stream.read(CHUNK)  # 80 ms of audio
+                if self.wake_model.predict(chunk.flatten())[WAKE_WORD] >= WAKE_THRESHOLD:
+                    return
+
+    def hear(self) -> str:
+        """Record RECORD_SECONDS of audio, then transcribe with Groq.
+        Returns "" if the recording was silent (or on error)."""
+        try:
+            audio = sd.rec(int(RECORD_SECONDS * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype="int16")
+            sd.wait()
+            if np.abs(audio).max() < SILENCE_THRESHOLD:  
+                return "" 
+            buffer = io.BytesIO()  # .wav in memory, never on disk
+            write(buffer, SAMPLE_RATE, audio)
+            result = self.groq_client.audio.transcriptions.create(
+                file=("audio.wav", buffer.getvalue()), model=STT_MODEL, language="en", temperature=0.0)
+            return result.text.strip()
+        except Exception as e:
+            print("Couldn't hear you:", e)
+            return ""
 
     def run(self):
+        awake = False 
         try:
             while True:
-                user = input("You: ")
-                if user.lower() in ('exit', 'quit'):
+                if VOICE_MODE:
+                    if not awake:
+                        print("Standby... say 'Hey Jarvis'")
+                        self.wait_for_wake_word()
+                        awake = True
+                        # self.speak("Yes?")
+                    user = self.hear()
+                    if not user:       
+                        awake = False
+                        continue
+                    print("You:", user)
+                else:
+                    user = input("You: ")
+
+                command = user.lower().strip(" .,!?")
+                if command in ('exit', 'quit'):
                     break
+                if not user:
+                    continue
                 reply = self.ask(user)
                 print("JARVIS:", reply)
                 if VOICE_MODE:
