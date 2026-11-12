@@ -23,9 +23,9 @@ Answering:
   prices, recent events). Summarize the results in your own words.
 - Use the PC tools only when the user asks you to do something on the computer.
 - After using a tool, say briefly what you did or found. If a tool fails, say so honestly.
-- If a request is unclear, ask one short question instead of guessing.
-"""
+- If a request is unclear, ask one short question instead of guessing."""
 
+prompt = SYSTEM_PROMPT
 
 class JARVIS:
     def __init__(self):
@@ -33,10 +33,6 @@ class JARVIS:
         Path(MEMORY_DIR).mkdir(exist_ok=True)
         Path(CHATS_DIR).mkdir(exist_ok=True)
         Path(PROFILE_FILE).touch(exist_ok=True)
-        prompt = SYSTEM_PROMPT
-        profile = PROFILE_FILE.read_text(encoding='utf-8').strip()
-        if profile:
-            prompt += f"What you know about the User\n:{profile}"
         self.chat_file = None
         self.client = genai.Client(api_key=os.getenv("JARVIS_API"))
         self.chats = self.client.chats.create(
