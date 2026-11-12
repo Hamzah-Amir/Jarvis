@@ -128,11 +128,30 @@ def remember(topic: str, fact: str) -> str:
     except Exception as e:
         return f"Could not save memory: {e}"
 
+def recall(topic:str) -> str:
+    """Read everything saved in long-term memory about a topic.
+
+    Use this when answering needs something you may have learned in a past chat:
+    the user's personal info, preferences, projects, people they mentioned,
+    or when they ask "do you remember...". Check memory before saying you don't know.
+
+    Call list_topics first to see which topics exist, and pass an exact topic name.
+
+    Args:
+        topic: An existing topic name from list_topics, e.g. "profile", "preferences".
+    """
+    try:
+        topic = slugify(topic)
+        path = MEMORY_DIR / f"{topic}.md"
+        if path.exists():
+            content = path.read_text(encoding='utf-8').strip()
+            return f"Memory of {topic}:\n{content}"
+        return f"Nothing saved about {topic} in the memory"
+    
+    except Exception as e:
+        return f"Could not read memory: {e}"
 
 if __name__ == "__main__":
     # from dotenv import load_dotenv
     # load_dotenv()
-    # print(silent_search("Who won the 2026 US midterm elections?", topic="news"))
-    print(remember("test", "First fact"))
-    print(remember("test", "First fact"))   # Already saved.
-    print(list_topics())                    # profile, test
+    print(silent_search("Who won the 2026 US midterm elections?", topic="news"))
