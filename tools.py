@@ -124,7 +124,8 @@ def remember(topic: str, fact: str) -> str:
             
         with open(path, 'a', encoding='utf-8') as memory:
             memory.write(f"- {fact}\n")
-            return f"Saved to {topic}: {fact}"
+        all_facts = path.read_text(encoding="utf-8").strip()
+        return f"Saved to {topic}. This topic now contains:\n{all_facts}"
     except Exception as e:
         return f"Could not save memory: {e}"
 

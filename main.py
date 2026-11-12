@@ -6,6 +6,7 @@ from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL, slug
 from dotenv import load_dotenv
 from pathlib import Path
 import json
+import time
 load_dotenv()
 
 SYSTEM_PROMPT = """You are JARVIS, a personal assistant running on the user's Windows PC.
@@ -30,10 +31,19 @@ Memory:
   save it with remember without asking. Don't announce that you saved it.
 - Basic facts about the user go in the "profile" topic. Call list_topics first and reuse
   an existing topic when one fits.
+- Never save a fact you already know (from your profile below or from recall),
+  even in different words. Only save genuinely new information.
 - Before saying you don't know something personal or from a past chat, call list_topics
   and then recall the relevant topic.
 
 """
+
+CLEANUP_PROMPT = """You maintain a memory file of facts about a user. Rewrite it cleanly:
+- Merge facts that mean the same thing into one fact.
+- If two facts contradict each other, keep only the newer one (facts lower in the list are newer).
+- Keep every distinct fact. Never invent, guess or add new information.
+- Each fact is short and self-contained, on its own line, starting with "- ".
+Return only the cleaned list, with no other text."""
 
 
 class JARVIS:
@@ -47,6 +57,9 @@ class JARVIS:
         if profile:
             prompt += f"What you know about the User:\n{profile}"
         self.chat_file = None
+        # memory files changed after this get cleaned on exit
+        # (-1s margin: Windows file times can lag slightly behind time.time())
+        self.start_time = time.time() - 1
         self.client = genai.Client(api_key=os.getenv("JARVIS_API"))
         self.chats = self.client.chats.create(
             model=MODEL,
@@ -73,8 +86,31 @@ class JARVIS:
         with open(self.chat_file, "w", encoding="utf-8") as file:
             json.dump(history, file, indent=2)
 
+    def clean_memory(self) -> None:
+        """Merge duplicate/outdated facts in memory topics that changed this session."""
+        for path in MEMORY_DIR.glob("*.md"):
+            if path.stat().st_mtime < self.start_time:
+                continue  # not changed this session
+            original = path.read_text(encoding="utf-8").strip()
+            if len(original.splitlines()) < 2:
+                continue  # nothing to merge
+            try:
+                response = self.client.models.generate_content(
+                    model=MODEL,
+                    contents=original,
+                    config={"system_instruction": CLEANUP_PROMPT},
+                )
+                facts = [line.strip() for line in (response.text or "").splitlines()
+                         if line.strip().startswith("- ")]
+                if not facts:
+                    continue  # bad response: keep the original untouched
+                path.with_suffix(".md.bak").write_text(original + "\n", encoding="utf-8")
+                path.write_text("\n".join(facts) + "\n", encoding="utf-8")
+            except Exception as e:
+                print(f"(Memory cleanup skipped for {path.stem}: {e})")
+
     def run(self):
-        try:    
+        try:
             while True:
                 user = input("You: ")
                 if user.lower() in ('exit', 'quit'):
@@ -82,6 +118,10 @@ class JARVIS:
                 reply = self.ask(user)
                 print("JARVIS:", reply)
         except KeyboardInterrupt:
+            print()
+        finally:
+            print("Tidying memory...")
+            self.clean_memory()
             print("Going standby!")
 
 if __name__ == "__main__":
