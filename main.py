@@ -1,15 +1,18 @@
 import os
 import io
+import asyncio
 from google import genai
+import edge_tts
 from groq import Groq
 import numpy as np
 import sounddevice as sd
+import soundfile as sf
 from openwakeword.vad import VAD
 from scipy.io.wavfile import write
 import pyttsx3
 from tools import search_web, get_time, open_app, silent_search, open_web, remember, list_topics, recall
 from datetime import datetime
-from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, AWAKE_SECONDS, VOICE_VOLUME, STT_MODEL, SAMPLE_RATE, RECORD_SECONDS, VOICE_MODE, VAD_THRESHOLD, MIN_SPEECH_FRAMES, MIN_PEAK, MIN_LOGPROB, DEBUG_STT, NO_SPEECH_MAX, slugify
+from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, AWAKE_SECONDS, VOICE_VOLUME, STT_MODEL, SAMPLE_RATE, RECORD_SECONDS, VOICE_MODE, VAD_THRESHOLD, MIN_SPEECH_FRAMES, MIN_PEAK, MIN_LOGPROB, DEBUG_STT, NO_SPEECH_MAX, VOICE_PITCH, VOICE, slugify
 from dotenv import load_dotenv
 from pathlib import Path
 import json
@@ -76,6 +79,15 @@ def _field(obj, key, default):
     if isinstance(obj, dict):
         return obj.get(key, default)
     return getattr(obj, key, default)
+
+async def _fetch_mp3(text: str) -> bytes:
+    """Get the spoken text as MP3 bytes from edge-tts (kept in memory)."""
+    mp3 = b""
+    communicate = edge_tts.Communicate(text, VOICE, rate=VOICE_RATE, pitch=VOICE_PITCH)
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            mp3 += chunk["data"]
+    return mp3
 
 class JARVIS:
     def __init__(self):
@@ -147,12 +159,21 @@ class JARVIS:
                 print(f"(Memory cleanup skipped for {path.stem}: {e})")
 
     def speak(self, text:str) -> None:
-        speak_engine = pyttsx3.init()
-        speak_engine.setProperty('rate', VOICE_RATE)
-        speak_engine.setProperty('volume', VOICE_VOLUME)
-        speak_engine.say(text)
-        speak_engine.runAndWait()
-        speak_engine.stop()
+        print("Fetching")
+        # timeout so a stuck connection raises an error instead of hanging forever
+        mp3 = asyncio.run(asyncio.wait_for(_fetch_mp3(text), timeout=15))
+        print("got", len(mp3), "bytes")
+
+        data, samplerate = sf.read(io.BytesIO(mp3))
+        print("playing")
+        sd.play(data, samplerate)
+        sd.wait()
+        # speak_engine = pyttsx3.init()
+        # speak_engine.setProperty('rate', VOICE_RATE)
+        # speak_engine.setProperty('volume', VOICE_VOLUME)
+        # speak_engine.say(text)
+        # speak_engine.runAndWait()
+        # speak_engine.stop()
 
     def hear(self) -> str:
         """Record RECORD_SECONDS of audio, then transcribe with Groq.

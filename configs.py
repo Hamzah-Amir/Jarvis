@@ -16,8 +16,10 @@ PROFILE_FILE = MEMORY_DIR / "profile.md"
 
 # TTS Configs.
 VOICE_MODE = True
-VOICE_RATE = 170         
+VOICE_RATE = "-8%"         
 VOICE_VOLUME = 0.9       
+VOICE_PITCH = '+6Hz'
+VOICE = 'en-GB-RyanNeural'
 
 # STT Configs
 RECORD_SECONDS = 5
