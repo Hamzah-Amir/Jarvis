@@ -6,11 +6,26 @@ from tavily import TavilyClient
 from configs import MEMORY_DIR, slugify
 
 def get_time() -> str:
-    """Get the current date and time."""
+    """Get the current date and time.
+
+    Use this when the user asks the time or date, or when you need today's date
+    to work out relative dates like "tomorrow" or "next Friday".
+    """
     return datetime.now().strftime("%A, %d %B %Y, %I:%M %p")
 
 def open_app(name:str) -> str:
-    """Open an application on windows (example notepad, excel, or any)"""
+    """Open an application installed on the user's Windows PC.
+
+    Use this when the user wants to open or start a program, e.g. "open notepad",
+    "start Word", "launch Spotify".
+    Convert the app's display name to its Windows program name yourself, e.g.
+    "Microsoft Word" -> "winword", "Calculator" -> "calc", "Google Chrome" -> "chrome".
+
+    Do NOT use this to open websites. Use open_web for that.
+
+    Args:
+        name: The Windows program name, e.g. "notepad", "calc", "winword", "excel", "chrome".
+    """
     try:
         os.startfile(name)
         return f"Opened app {name}"
@@ -41,9 +56,16 @@ def open_web(url: str) -> str:
 
 def search_web(query: str) -> str:
     """Open a Google search for the query in the user's web browser.
+
     Only use this when the user explicitly asks to search the web, google something,
     or open results in the browser. You cannot read the results, so never use this
-    to answer questions yourself. Do NOT use this to open a website; use open_web for that."""
+    to answer questions yourself; use silent_search for that.
+
+    Do NOT use this to open a website. Use open_web for that.
+
+    Args:
+        query: What to search for, e.g. "best budget laptops 2026".
+    """
     webbrowser.open(url=f"https://www.google.com/search?q={query}", new=0)
     return f"Searched for {query}"
 
@@ -106,6 +128,7 @@ def remember(topic: str, fact: str) -> str:
     they say "remember that...". Do NOT save small talk, one-off questions or temporary details.
 
     Call list_topics first and reuse an existing topic if one fits.
+    Never save a fact that is already in memory, even in different words.
 
     Args:
         topic: Short topic name, e.g. "profile" (name, studies, basics about the user),
