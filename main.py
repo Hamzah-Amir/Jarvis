@@ -9,7 +9,7 @@ from scipy.io.wavfile import write
 import pyttsx3
 from tools import search_web, get_time, open_app, silent_search, open_web, remember, list_topics, recall
 from datetime import datetime
-from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, AWAKE_SECONDS, VOICE_VOLUME, STT_MODEL,MIN_SPEECH_PIECES, SAMPLE_RATE, RECORD_SECONDS, VOICE_MODE, slugify
+from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, AWAKE_SECONDS, VOICE_VOLUME, STT_MODEL, SAMPLE_RATE, RECORD_SECONDS, VOICE_MODE, VAD_THRESHOLD, MIN_SPEECH_FRAMES, MIN_PEAK, MIN_LOGPROB, DEBUG_STT, NO_SPEECH_MAX, slugify
 from dotenv import load_dotenv
 from pathlib import Path
 import json
@@ -66,6 +66,14 @@ Example output:
 
 Return only the cleaned list, with no other text."""
 
+
+HALLUCINATIONS = {"thank you", "thanks", "thanks for watching",
+                  "thank you for watching", "you", "bye", "so", "hmm", "uh", "um"}
+
+def _field(obj, key, default):
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
 
 class JARVIS:
     def __init__(self):
@@ -150,19 +158,43 @@ class JARVIS:
         try:
             audio = sd.rec(int(RECORD_SECONDS * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype="int16")
             sd.wait()
+            audio = audio.flatten()
+            peak = int(np.abs(audio).max())
+            if peak < MIN_PEAK:
+                if DEBUG_STT: print(f"[stt] skipped: quiet (peak={peak})")
+                return ""
 
             # skip silent recordings (VAD), so silence isn't sent to Groq
             self.vad.reset_states()                                          # fresh start for each recording
-            pieces = audio.flatten()[: len(audio) // 1600 * 1600].reshape(-1, 1600)  # 0.1 s pieces
-            speech = sum(self.vad.predict(p, frame_size=1600) > 0.5 for p in pieces) # count voice pieces
-            if speech < MIN_SPEECH_PIECES:                                   # < 0.5 s of voice = silence
-                return ""
+            frames = audio[: len(audio) // 480 * 480].reshape(-1, 480)
+            speech = sum(self.vad.predict(f, frame_size=480) > VAD_THRESHOLD for f in frames)
+            if DEBUG_STT: print(f"[stt] peak={peak} speech_frames={speech}")
+            if speech < MIN_SPEECH_FRAMES:
+                return "" 
             
             buffer = io.BytesIO()  # .wav in memory, never on disk
             write(buffer, SAMPLE_RATE, audio)
             result = self.groq_client.audio.transcriptions.create(
-                file=("audio.wav", buffer.getvalue()), model=STT_MODEL, language="en", temperature=0.0)
-            return result.text.strip()
+                file=("audio.wav", buffer.getvalue()), model=STT_MODEL, language="en", temperature=0.0, response_format='verbose_json')
+            segments = getattr(result, "segments", None)
+            if segments:
+                parts = []
+                for seg in segments:
+                    no_speech = _field(seg, "no_speech_prob", 0.0)
+                    logprob = _field(seg, "avg_logprob", 0.0)
+                    if DEBUG_STT:
+                        print(f"[stt] '{_field(seg, 'text', '').strip()}' no_speech={no_speech:.2f} logprob={logprob:.2f}")
+                    if no_speech > NO_SPEECH_MAX or logprob < MIN_LOGPROB:
+                        continue
+                    parts.append(_field(seg, "text", "").strip())
+                text = " ".join(parts).strip()
+            else:
+                text = result.text.strip()
+
+            if text.lower().strip(" .,!?") in HALLUCINATIONS:
+                return ""
+            return text
+        
         except Exception as e:
             print("Couldn't hear you:", e)
             return ""
@@ -190,6 +222,7 @@ class JARVIS:
                     elif not user:
                         if time.time() - last_active > AWAKE_SECONDS:
                             awake = False
+                            print("Going standby...")
                             self.speak("Going standby")                
                 else:
                     user = input("You: ")

@@ -25,8 +25,14 @@ SAMPLE_RATE = 16000
 STT_MODEL = "whisper-large-v3-turbo"
 
 # Listening Configs
-MIN_SPEECH_PIECES = 5      # 0.1 s pieces of voice needed (5 = 0.5 s); fewer = silent recording
-AWAKE_SECONDS = 15         # seconds without a command before going back to standby
+AWAKE_SECONDS = 15
+VAD_THRESHOLD = 0.6        # per 30 ms frame; higher = stricter
+MIN_SPEECH_FRAMES = 8     # 30 ms frames of voice needed (~0.36 s)
+MIN_PEAK = 400             # int16 loudness; clips quieter than this are skipped
+NO_SPEECH_MAX = 0.5        # drop Groq segments more likely silence than this
+MIN_LOGPROB = -1.0         # drop low-confidence segments
+DEBUG_STT = True           # print values so you can tune the numbers above
+
 def slugify(text: str, max_length: int = 40) -> str:
     """Turn text into a safe filename part, e.g. "Who won? Pak vs Iran!" -> "who-won-pak-vs-iran"."""
     text = text.lower().strip()
