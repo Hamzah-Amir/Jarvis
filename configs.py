@@ -24,13 +24,9 @@ RECORD_SECONDS = 5
 SAMPLE_RATE = 16000
 STT_MODEL = "whisper-large-v3-turbo"
 
-# Wake word Configs
-WAKE_WORD = "hey_jarvis"   # built-in openWakeWord model name
-WAKE_THRESHOLD = 0.5       # score 0-1 needed to count as detected (raise if false triggers)
-CHUNK = 1280               # samples per mic read = 80 ms at 16 kHz (what openWakeWord expects)
-SILENCE_THRESHOLD = 1000   # loudest sample below this = silent recording -> back to standby
-MIN_SPEECH_PIECES = 5 
-
+# Listening Configs
+MIN_SPEECH_PIECES = 5      # 0.1 s pieces of voice needed (5 = 0.5 s); fewer = silent recording
+AWAKE_SECONDS = 15         # seconds without a command before going back to standby
 def slugify(text: str, max_length: int = 40) -> str:
     """Turn text into a safe filename part, e.g. "Who won? Pak vs Iran!" -> "who-won-pak-vs-iran"."""
     text = text.lower().strip()

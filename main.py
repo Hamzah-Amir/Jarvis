@@ -4,13 +4,12 @@ from google import genai
 from groq import Groq
 import numpy as np
 import sounddevice as sd
-from openwakeword.model import Model
 from openwakeword.vad import VAD
 from scipy.io.wavfile import write
 import pyttsx3
 from tools import search_web, get_time, open_app, silent_search, open_web, remember, list_topics, recall
 from datetime import datetime
-from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, VOICE_VOLUME, STT_MODEL,MIN_SPEECH_PIECES, SAMPLE_RATE, RECORD_SECONDS, CHUNK, VOICE_MODE, WAKE_WORD, WAKE_THRESHOLD, SILENCE_THRESHOLD, slugify
+from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, AWAKE_SECONDS, VOICE_VOLUME, STT_MODEL,MIN_SPEECH_PIECES, SAMPLE_RATE, RECORD_SECONDS, VOICE_MODE, slugify
 from dotenv import load_dotenv
 from pathlib import Path
 import json
@@ -93,8 +92,7 @@ class JARVIS:
             })
         # groq
         self.groq_client = Groq(api_key=os.getenv("JARVIS_EARS"))
-        # wake word model (loaded once, runs locally)
-        self.wake_model = Model(wakeword_models=[WAKE_WORD], inference_framework="onnx", vad_threshold=0.5)
+        # voice activity detector (local, used to skip silent recordings)
         self.vad = VAD()
 
     def ask(self, text: str) ->str:
@@ -146,15 +144,6 @@ class JARVIS:
         speak_engine.runAndWait()
         speak_engine.stop()
 
-    def wait_for_wake_word(self) -> None:
-        """STANDBY: block until 'Hey Jarvis' is heard. Runs locally, nothing is sent online."""
-        self.wake_model.reset()  # forget old scores so it doesn't instantly re-trigger
-        with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="int16", blocksize=CHUNK) as stream:
-            while True:
-                chunk, _ = stream.read(CHUNK)  # 80 ms of audio
-                if self.wake_model.predict(chunk.flatten())[WAKE_WORD] >= WAKE_THRESHOLD:
-                    return
-
     def hear(self) -> str:
         """Record RECORD_SECONDS of audio, then transcribe with Groq.
         Returns "" if the recording was silent (or on error)."""
@@ -162,7 +151,7 @@ class JARVIS:
             audio = sd.rec(int(RECORD_SECONDS * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype="int16")
             sd.wait()
 
-            # Adjusting BG voices
+            # skip silent recordings (VAD), so silence isn't sent to Groq
             self.vad.reset_states()                                          # fresh start for each recording
             pieces = audio.flatten()[: len(audio) // 1600 * 1600].reshape(-1, 1600)  # 0.1 s pieces
             speech = sum(self.vad.predict(p, frame_size=1600) > 0.5 for p in pieces) # count voice pieces
@@ -180,22 +169,30 @@ class JARVIS:
 
     def run(self):
         awake = False 
+        last_active = 0
         try:
             while True:
+                
                 if VOICE_MODE:
-                    if not awake:
-                        print("Standby... say 'Hey Jarvis'")
-                        self.wait_for_wake_word()
-                        awake = True
-                        # self.speak("Yes?")
                     user = self.hear()
-                    if not user:       
-                        awake = False
-                        continue
-                    print("You:", user)
+                    if user:
+                        print("You: ", user)
+                    if not awake:
+                        if not user or "jarvis" not in user.lower():
+                            continue 
+                        awake = True
+                        user = user.lower().split("jarvis", 1)[1].strip(" ,.!?")  
+                        if not user:            
+                            self.speak("Yes?")
+                            last_active = time.time()
+                            continue
+
+                    elif not user:
+                        if time.time() - last_active > AWAKE_SECONDS:
+                            awake = False
+                            self.speak("Going standby")                
                 else:
                     user = input("You: ")
-
                 command = user.lower().strip(" .,!?")
                 if command in ('exit', 'quit'):
                     break
@@ -205,6 +202,7 @@ class JARVIS:
                 print("JARVIS:", reply)
                 if VOICE_MODE:
                     self.speak(reply)
+                last_active = time.time()
         except KeyboardInterrupt:
             print()
         finally:
