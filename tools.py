@@ -39,7 +39,8 @@ def open_web(url: str) -> str:
     e.g. "open youtube", "go to github.com", "open my gmail".
     Convert site names to full URLs yourself, e.g. "youtube" -> "https://www.youtube.com".
 
-    Do NOT use this to search for something. Use search_web for that.
+    Do NOT use this to search for something. To answer a question, use silent_search.
+    To show search results in the browser, use search_web.
 
     Args:
         url: The website URL, e.g. "https://www.youtube.com".
