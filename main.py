@@ -12,7 +12,7 @@ from scipy.io.wavfile import write
 import pyttsx3
 from tools import search_web, get_time, open_app, silent_search, open_web, remember, list_topics, recall
 from datetime import datetime
-from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, AWAKE_SECONDS, VOICE_VOLUME, STT_MODEL, SAMPLE_RATE, RECORD_SECONDS, VOICE_MODE, VAD_THRESHOLD, MIN_SPEECH_FRAMES, MIN_PEAK, MIN_LOGPROB, DEBUG_STT, NO_SPEECH_MAX, VOICE_PITCH, VOICE, slugify
+from configs import STORAGE_DIR, CHATS_DIR, MEMORY_DIR, PROFILE_FILE,MODEL,VOICE_RATE, AWAKE_SECONDS, VOICE_VOLUME, STT_MODEL, SAMPLE_RATE, RECORD_SECONDS, VOICE_MODE, VAD_THRESHOLD, MIN_SPEECH_FRAMES, MIN_LOGPROB, DEBUG_STT, NO_SPEECH_MAX, VOICE_PITCH, VOICE, slugify
 from dotenv import load_dotenv
 from pathlib import Path
 import json
@@ -27,6 +27,7 @@ Style:
 - Be brief: 1-3 sentences by default. Give longer answers only when the user
   asks for detail, a history, an explanation or a list.
 - Be friendly and direct. Don't repeat the question or add filler.
+- Don't address the user by name. Use it only when greeting them at the start of a chat.
 
 Answering:
 - Answer from your own knowledge whenever you can.
@@ -183,9 +184,6 @@ class JARVIS:
             sd.wait()
             audio = audio.flatten()
             peak = int(np.abs(audio).max())
-            if peak < MIN_PEAK:
-                if DEBUG_STT: print(f"[stt] skipped: quiet (peak={peak})")
-                return ""
 
             # skip silent recordings (VAD), so silence isn't sent to Groq
             self.vad.reset_states()                                          # fresh start for each recording

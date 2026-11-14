@@ -16,7 +16,7 @@ PROFILE_FILE = MEMORY_DIR / "profile.md"
 
 # TTS Configs.
 VOICE_MODE = True
-VOICE_RATE = "-8%"         
+VOICE_RATE = "-5%"         
 VOICE_VOLUME = 0.9       
 VOICE_PITCH = '+6Hz'
 VOICE = 'en-GB-RyanNeural'
@@ -27,12 +27,11 @@ SAMPLE_RATE = 16000
 STT_MODEL = "whisper-large-v3-turbo"
 
 # Listening Configs
-AWAKE_SECONDS = 15
+AWAKE_SECONDS = 20
 VAD_THRESHOLD = 0.6        # per 30 ms frame; higher = stricter
-MIN_SPEECH_FRAMES = 8     # 30 ms frames of voice needed (~0.36 s)
-MIN_PEAK = 400             # int16 loudness; clips quieter than this are skipped
+MIN_SPEECH_FRAMES = 6     # 30 ms frames of voice needed (~0.36 s)
 NO_SPEECH_MAX = 0.5        # drop Groq segments more likely silence than this
-MIN_LOGPROB = -1.0         # drop low-confidence segments
+MIN_LOGPROB = -1.2         # drop low-confidence segments
 DEBUG_STT = True           # print values so you can tune the numbers above
 
 def slugify(text: str, max_length: int = 40) -> str:
